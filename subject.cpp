@@ -39,42 +39,71 @@ void Reader::readCommands()
     bool dynamicMode = false;
     int openBracketNumber = 0;
     int closeBracketNumber = 0;
+    bool stopped = false;
 
-    while (true) {
+    while (!stopped) {
         std::string temp;
-        std::cin >> temp;
+        std::getline(std::cin, temp);
 
-        if(m_commands.empty())
-            m_timeOfFirstCommand = get_seconds_since_epoch();
+        if(!temp.empty())
+        {
+            m_nStrings++;
+            if(m_commands.empty())
+                m_timeOfFirstCommand = get_seconds_since_epoch();
 
-        if(temp == "}") {
-            closeBracketNumber++;
-            if(dynamicMode && !m_commands.empty() && (closeBracketNumber == openBracketNumber)) {
-                notifyObservers();
-                m_commands.clear();
-                dynamicMode = false;
+            if(temp == "}") {
+                closeBracketNumber++;
+                if(dynamicMode && !m_commands.empty() && (closeBracketNumber == openBracketNumber)) {
+                    m_nBlocks++;
+                    m_nCommands += m_commands.size();
+                    notifyObservers();
+                    m_commands.clear();
+                    dynamicMode = false;
+                }
+                continue;
             }
-            continue;
-        }
-        if(temp == "{") {
-            openBracketNumber++;
-            if(!dynamicMode) {
-                m_commands.clear();
-                dynamicMode = true;
+            if(temp == "{") {
+                openBracketNumber++;
+                if(!dynamicMode) {
+                    m_commands.clear();
+                    dynamicMode = true;
+                }
+                continue;
             }
-            continue;
-        }
 
-        m_commands.push_back(temp);
-        if(!dynamicMode && m_commands.size() == m_N) {
-           notifyObservers();
-           m_commands.clear();
+            m_commands.push_back(temp);
+            if(!dynamicMode && m_commands.size() == m_N) {
+               notifyObservers();
+               m_nBlocks++;
+               m_nCommands += m_commands.size();
+               m_commands.clear();
+            }
+        }
+        else if(!m_commands.empty())
+        {
+            m_nBlocks++;
+            m_nCommands += m_commands.size();
+            notifyObservers();
+            m_commands.clear();
+            break;
+        }
+        else
+        {
+            stopped = true;
+            notifyObservers();
+
         }
     }
+    printSummary();
 }
 
 void Reader::notifyObservers()
 {
     for(const auto& observer: m_observers)
-        observer->update(m_commands, m_timeOfFirstCommand);    
+        observer->update(m_commands, m_timeOfFirstCommand);
+}
+
+void Reader::printSummary()
+{
+    std::cout << m_nStrings << " strings, " << m_nCommands << " commands, " << m_nBlocks << " blocks" << std::endl;
 }

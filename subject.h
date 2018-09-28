@@ -36,9 +36,13 @@ public:
 
 private:
     virtual void notifyObservers();
+    void printSummary();
 
 private:
     std::size_t m_N;
-    std::vector<std::string> m_commands;
-    long m_timeOfFirstCommand = 0;
+    std::vector<std::string>    m_commands;
+    long                        m_timeOfFirstCommand = 0;
+    int                         m_nStrings;
+    int                         m_nBlocks;
+    int                         m_nCommands;
 };

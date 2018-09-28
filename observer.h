@@ -2,6 +2,14 @@
 #include <vector>
 #include <string>
 #include <fstream>
+#include <thread>
+#include <mutex>
+#include <queue>
+#include <future>
+#include <condition_variable>
+#include <functional>
+#include <memory>
+#include <tuple>
 
 class Observer {
 public:
@@ -9,10 +17,26 @@ public:
     virtual void update(const std::vector<std::string>& newCommands, long time) = 0;
 };
 
-class Registrator: public Observer {
+class Registrator: public Observer {    
 public:
-    Registrator() = default;
+    Registrator();
+    ~Registrator();
     void update(const std::vector<std::string>& newCommands, long time);
+
 private:
-    std::ofstream m_bulkLog;
+    void workerThread();
+
+    std::string prepareData(const std::vector<std::string>& newCommands) const;
+    void writeStdOuput(std::string &data);
+    void writeFileLog(std::string& data, long time);
+    void printSummary(int nblocks, int ncommand);
+
+private:
+
+    bool                                            m_isStopped;
+    std::queue<std::tuple<std::string, int, long>>  m_tasks;
+
+    std::vector<std::thread>                        m_workers;
+    std::mutex                                      m_queueMutex;
+    std::condition_variable                         m_condition;
 };
