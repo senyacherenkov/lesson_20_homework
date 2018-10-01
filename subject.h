@@ -42,7 +42,7 @@ private:
     std::size_t m_N;
     std::vector<std::string>    m_commands;
     long                        m_timeOfFirstCommand = 0;
-    int                         m_nStrings;
-    int                         m_nBlocks;
-    int                         m_nCommands;
+    int                         m_nStrings = 0;
+    int                         m_nBlocks = 0;
+    int                         m_nCommands = 0;
 };

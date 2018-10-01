@@ -18,6 +18,7 @@ public:
 };
 
 class Registrator: public Observer {    
+    using TTaskCallback = std::function<size_t()>;
 public:
     Registrator();
     ~Registrator();
@@ -27,14 +28,14 @@ private:
     void workerThread();
 
     std::string prepareData(const std::vector<std::string>& newCommands) const;
-    void writeStdOuput(std::string &data);
-    void writeFileLog(std::string& data, long time);
+    void writeStdOuput(std::string data);
+    void writeFileLog(std::string data, long time);
     void printSummary(int nblocks, int ncommand);
 
 private:
 
     bool                                            m_isStopped;
-    std::queue<std::tuple<std::string, int, long>>  m_tasks;
+    std::queue<TTaskCallback>                       m_tasks;
 
     std::vector<std::thread>                        m_workers;
     std::mutex                                      m_queueMutex;
