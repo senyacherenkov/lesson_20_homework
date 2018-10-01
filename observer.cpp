@@ -5,7 +5,7 @@
 Registrator::Registrator():
     m_isStopped(false)
 {
-    for(size_t i = 0; i < 3; i++)
+    for(size_t i = 0; i < 2; i++)
         m_workers.emplace_back(
                     [this]
                         {
@@ -15,43 +15,42 @@ Registrator::Registrator():
                             while (!m_isStopped) {
 
                                 std::unique_lock<std::mutex> lck{m_queueMutex};
+                                std::cout << "I'm ready for work. I'm logger " << std::this_thread::get_id() << std::endl;
 
-                                m_condition.wait(lck, [this](){ return m_isStopped && !m_tasks.empty(); });
+                                m_condition.wait(lck, [this](){ return m_isStopped && !m_fileLogQueue.empty(); });
 
                                 if (m_isStopped)
                                     break;
 
-                                auto task = m_tasks.front();
-                                m_tasks.pop();
+                                auto task = m_fileLogQueue.front();
+                                m_fileLogQueue.pop();
 
-                                std::cout << blocksNumber << " " << std::this_thread::get_id() << std::endl;
-                                std::cout << commandsNumber << " " << std::this_thread::get_id() << std::endl;
                                 lck.unlock();
 
                                 blocksNumber++;
-                                std::cout << blocksNumber << " " << std::this_thread::get_id() << std::endl;
 
-                                commandsNumber += task();
-                                std::cout << commandsNumber << " " << std::this_thread::get_id() << std::endl;
+                                size_t nCommands = task();
+                                commandsNumber += nCommands;
                             }
 
-                            while(!m_tasks.empty()) {
-                                std::unique_lock<std::mutex> lck{m_queueMutex};
-                                auto task = m_tasks.front();
-                                m_tasks.pop();
-                                std::cout << blocksNumber << " " << std::this_thread::get_id() << std::endl;
-                                std::cout << commandsNumber << " " << std::this_thread::get_id() << std::endl;
-                                lck.unlock();
+//                            while(!m_fileLogQueue.empty()) {
+//                                std::unique_lock<std::mutex> lck{m_queueMutex};
+//                                auto task = m_fileLogQueue.front();
+//                                m_fileLogQueue.pop();
 
-                                blocksNumber++;
-                                std::cout << blocksNumber << " " << std::this_thread::get_id() << std::endl;
+//                                lck.unlock();
 
-                                commandsNumber += task();
-                                std::cout << commandsNumber << " " << std::this_thread::get_id() << std::endl;
-                            }
+//                                blocksNumber++;
+//                                size_t nCommands = task();
+//                                commandsNumber += nCommands;
+//                            }
 
+                            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                            std::cout << "filelog" << std::endl;
                             printSummary(blocksNumber, commandsNumber);
                         });
+
+    m_stdOutWorker = std::thread(&Registrator::writeStdOuput, this);
 }
 
 
@@ -66,6 +65,7 @@ Registrator::~Registrator()
     for(std::thread& worker: m_workers){
         worker.join();
     }
+    m_stdOutWorker.join();
 }
 
 
@@ -86,10 +86,45 @@ std::string Registrator::prepareData(const std::vector<std::string>& newCommands
     return output;
 }
 
-void Registrator::writeStdOuput(std::string data)
+void Registrator::writeStdOuput()
 {
-    std::unique_lock<std::mutex> lck{m_queueMutex};
-    std::cout << data << std::endl;    
+    thread_local int blocksNumber = 0;
+    thread_local int commandsNumber = 0;
+
+    while (!m_isStopped) {
+
+        std::unique_lock<std::mutex> lck{m_queueMutex};
+        std::cout << "I'm ready for work. I'm stdout " << std::this_thread::get_id() << std::endl;
+        m_condition.wait(lck, [this](){ return m_isStopped && !m_stdOutQueue.empty(); });
+
+        if (m_isStopped)
+            break;
+
+        auto pair = m_stdOutQueue.front();
+        m_stdOutQueue.pop();
+
+        std::cout << pair.first << std::endl;
+
+        lck.unlock();
+
+        blocksNumber++;
+        commandsNumber += pair.second;
+    }
+
+    while(!m_stdOutQueue.empty()) {
+        std::unique_lock<std::mutex> lck{m_queueMutex};
+        auto pair = m_stdOutQueue.front();
+        m_stdOutQueue.pop();
+
+        std::cout << pair.first << std::endl;
+        lck.unlock();
+
+        blocksNumber++;
+        commandsNumber += pair.second;
+    }
+
+    std::cout << "stdout" << std::endl;
+    printSummary(blocksNumber, commandsNumber);
 }
 
 void Registrator::writeFileLog(std::string data, long time)
@@ -118,8 +153,12 @@ void Registrator::printSummary(int nblocks, int ncommand)
 
 void Registrator::update(const std::vector<std::string> &newCommands, long time)
 {
-    if(newCommands.empty())
+    if(newCommands.empty()) {
+        std::unique_lock<std::mutex> lck(m_queueMutex);
         m_isStopped = true;
+        m_condition.notify_all();
+        return;
+    }
 
     std::lock_guard<std::mutex> guard(m_queueMutex);
     std::string output = prepareData(newCommands);
@@ -130,13 +169,9 @@ void Registrator::update(const std::vector<std::string> &newCommands, long time)
                                                                return size;
                                                           };
 
-    auto stdTask = [output, size, this]() -> size_t {
-                                                        writeStdOuput(output);
-                                                        return size;
-                                                    };
-    m_tasks.push(logTask);
-    m_tasks.push(logTask);
-    m_tasks.push(stdTask);
+    m_stdOutQueue.push(std::make_pair(output, size));
+    m_fileLogQueue.push(logTask);
+
     m_condition.notify_all();
 }
 

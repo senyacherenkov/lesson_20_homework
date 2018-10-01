@@ -106,5 +106,5 @@ void Reader::notifyObservers()
 
 void Reader::printSummary()
 {
-    std::cout << m_nStrings << " strings, " << m_nCommands << " commands, " << m_nBlocks << " blocks" << std::endl;
+    std::cout << "main " << m_nStrings << " strings, " << m_nCommands << " commands, " << m_nBlocks << " blocks" << std::endl;
 }

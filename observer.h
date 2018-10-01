@@ -28,16 +28,18 @@ private:
     void workerThread();
 
     std::string prepareData(const std::vector<std::string>& newCommands) const;
-    void writeStdOuput(std::string data);
+    void writeStdOuput();
     void writeFileLog(std::string data, long time);
     void printSummary(int nblocks, int ncommand);
 
 private:
 
     bool                                            m_isStopped;
-    std::queue<TTaskCallback>                       m_tasks;
+    std::queue<TTaskCallback>                       m_fileLogQueue;
+    std::queue<std::pair<std::string, size_t>>      m_stdOutQueue;
 
     std::vector<std::thread>                        m_workers;
+    std::thread                                     m_stdOutWorker;
     std::mutex                                      m_queueMutex;
     std::condition_variable                         m_condition;
 };
