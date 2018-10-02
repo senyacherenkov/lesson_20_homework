@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(bulk_parallel)
-#VERSION 0.0.$ENV{TRAVIS_BUILD_NUMBER})
+project(bulk_parallel VERSION 0.0.$ENV{TRAVIS_BUILD_NUMBER})
 
 set(CMAKE_BUILD_TYPE DEBUG)
 
