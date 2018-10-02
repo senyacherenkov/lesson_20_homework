@@ -1,10 +1,20 @@
 #include <iostream>
 #include <string>
+#include <algorithm>
 #include "observer.h"
+
+namespace  {
+    struct unique {
+      int m_current = 0;
+      int operator()() {return ++m_current;}
+    } UniqueNumber;
+}
 
 Registrator::Registrator():
     m_isStopped(false)
 {
+    std::generate(m_loadBuffer.begin(), m_loadBuffer.end(), UniqueNumber);
+
     for(size_t i = 0; i < 2; i++)
         m_workers.emplace_back(
                     [this]
@@ -15,13 +25,14 @@ Registrator::Registrator():
                             while (!m_isStopped) {
 
                                 std::unique_lock<std::mutex> lck{m_queueMutex};
-                                std::cout << "I'm ready for work. I'm logger " << std::this_thread::get_id() << std::endl;
 
-                                m_condition.wait(lck, [this](){ return m_isStopped && !m_fileLogQueue.empty(); });
+                                while (!m_isStopped && m_fileLogQueue.empty())
+                                    m_condition.wait(lck);
 
                                 if (m_isStopped)
                                     break;
 
+                                std::random_shuffle(m_loadBuffer.begin(), m_loadBuffer.end());
                                 auto task = m_fileLogQueue.front();
                                 m_fileLogQueue.pop();
 
@@ -33,20 +44,18 @@ Registrator::Registrator():
                                 commandsNumber += nCommands;
                             }
 
-//                            while(!m_fileLogQueue.empty()) {
-//                                std::unique_lock<std::mutex> lck{m_queueMutex};
-//                                auto task = m_fileLogQueue.front();
-//                                m_fileLogQueue.pop();
+                            while(!m_fileLogQueue.empty()) {
+                                std::unique_lock<std::mutex> lck{m_queueMutex};
+                                auto task = m_fileLogQueue.front();
+                                m_fileLogQueue.pop();
 
-//                                lck.unlock();
+                                lck.unlock();
 
-//                                blocksNumber++;
-//                                size_t nCommands = task();
-//                                commandsNumber += nCommands;
-//                            }
+                                blocksNumber++;
+                                size_t nCommands = task();
+                                commandsNumber += nCommands;
+                            }
 
-                            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                            std::cout << "filelog" << std::endl;
                             printSummary(blocksNumber, commandsNumber);
                         });
 
@@ -94,12 +103,14 @@ void Registrator::writeStdOuput()
     while (!m_isStopped) {
 
         std::unique_lock<std::mutex> lck{m_queueMutex};
-        std::cout << "I'm ready for work. I'm stdout " << std::this_thread::get_id() << std::endl;
-        m_condition.wait(lck, [this](){ return m_isStopped && !m_stdOutQueue.empty(); });
+
+        while (!m_isStopped && m_stdOutQueue.empty())
+            m_condition.wait(lck);
 
         if (m_isStopped)
             break;
 
+        std::random_shuffle(m_loadBuffer.begin(), m_loadBuffer.end());
         auto pair = m_stdOutQueue.front();
         m_stdOutQueue.pop();
 
@@ -123,7 +134,6 @@ void Registrator::writeStdOuput()
         commandsNumber += pair.second;
     }
 
-    std::cout << "stdout" << std::endl;
     printSummary(blocksNumber, commandsNumber);
 }
 

@@ -42,4 +42,6 @@ private:
     std::thread                                     m_stdOutWorker;
     std::mutex                                      m_queueMutex;
     std::condition_variable                         m_condition;
+
+    std::vector<int>                                m_loadBuffer;
 };
