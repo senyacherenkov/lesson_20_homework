@@ -22,14 +22,14 @@ Registrator::Registrator():
                             thread_local int blocksNumber = 0;
                             thread_local int commandsNumber = 0;
 
-                            while (!m_isStopped) {
+                            while (!m_isStopped.load(std::memory_order_relaxed)) {
 
-                                std::unique_lock<std::mutex> lck{m_queueMutex};
+                                std::unique_lock<std::mutex> lck{m_fileMutex};
 
-                                while (!m_isStopped && m_fileLogQueue.empty())
-                                    m_condition.wait(lck);
+                                while (!m_isStopped.load(std::memory_order_relaxed) && m_fileLogQueue.empty())
+                                    m_fileCondition.wait(lck);
 
-                                if (m_isStopped)
+                                if (m_isStopped.load(std::memory_order_relaxed))
                                     break;
 
                                 std::random_shuffle(m_loadBuffer.begin(), m_loadBuffer.end());
@@ -45,7 +45,7 @@ Registrator::Registrator():
                             }
 
                             while(!m_fileLogQueue.empty()) {
-                                std::unique_lock<std::mutex> lck{m_queueMutex};
+                                std::unique_lock<std::mutex> lck{m_fileMutex};
                                 auto task = m_fileLogQueue.front();
                                 m_fileLogQueue.pop();
 
@@ -65,12 +65,10 @@ Registrator::Registrator():
 
 Registrator::~Registrator()
 {
-    {
-        std::unique_lock<std::mutex> lck(m_queueMutex);
-        m_isStopped = true;
-    }
+    m_isStopped.store(true, std::memory_order_relaxed);
 
-    m_condition.notify_all();
+    m_fileCondition.notify_all();
+    m_stdoutCondition.notify_all();
     for(std::thread& worker: m_workers){
         worker.join();
     }
@@ -87,9 +85,9 @@ std::string Registrator::prepareData(const std::vector<std::string>& newCommands
 
     output.append("bulk: ");
 
-    for(const auto& command: newCommands) {
-        output.append(command);
-        if(command != newCommands[newCommands.size() - 1])
+    for(auto it = newCommands.begin(); it < newCommands.end(); it++) {
+        output.append(*it);
+        if(it != std::next(newCommands.begin(), static_cast<long>(newCommands.size() - 1)))
             output.append(", ");
     }
     return output;
@@ -100,35 +98,35 @@ void Registrator::writeStdOuput()
     thread_local int blocksNumber = 0;
     thread_local int commandsNumber = 0;
 
-    while (!m_isStopped) {
+    while (!m_isStopped.load(std::memory_order_relaxed)) {
 
-        std::unique_lock<std::mutex> lck{m_queueMutex};
+        std::unique_lock<std::mutex> lck{m_stdoutMutex};
 
-        while (!m_isStopped && m_stdOutQueue.empty())
-            m_condition.wait(lck);
+        while (!m_isStopped.load(std::memory_order_relaxed) && m_stdOutQueue.empty())
+            m_stdoutCondition.wait(lck);
 
-        if (m_isStopped)
+        if (m_isStopped.load(std::memory_order_relaxed))
             break;
 
         std::random_shuffle(m_loadBuffer.begin(), m_loadBuffer.end());
         auto pair = m_stdOutQueue.front();
         m_stdOutQueue.pop();
 
-        std::cout << pair.first << std::endl;
-
         lck.unlock();
+
+        std::cout << pair.first << std::endl;        
 
         blocksNumber++;
         commandsNumber += pair.second;
     }
 
     while(!m_stdOutQueue.empty()) {
-        std::unique_lock<std::mutex> lck{m_queueMutex};
+        std::unique_lock<std::mutex> lck{m_stdoutMutex};
         auto pair = m_stdOutQueue.front();
         m_stdOutQueue.pop();
-
-        std::cout << pair.first << std::endl;
         lck.unlock();
+
+        std::cout << pair.first << std::endl;        
 
         blocksNumber++;
         commandsNumber += pair.second;
@@ -139,13 +137,11 @@ void Registrator::writeStdOuput()
 
 void Registrator::writeFileLog(std::string data, long time)
 {
-    std::unique_lock<std::mutex> lck{m_queueMutex};
-
+    m_logCounter++;
     std::string nameOfFile("bulk");
-    std::hash<std::thread::id> h;
     nameOfFile.append(std::to_string(time));
     nameOfFile.append("_");
-    nameOfFile.append(std::to_string(h(std::this_thread::get_id())));
+    nameOfFile.append(std::to_string(m_logCounter));
     nameOfFile.append(".log");
 
     std::ofstream bulkLog;
@@ -155,22 +151,20 @@ void Registrator::writeFileLog(std::string data, long time)
 }
 
 void Registrator::printSummary(int nblocks, int ncommand)
-{
-    std::unique_lock<std::mutex> lck{m_queueMutex};
+{    
     std::cout << "thread - " << std::this_thread::get_id()
               << " " << nblocks << " blocks, " << ncommand << " commands" << std::endl;
 }
 
 void Registrator::update(const std::vector<std::string> &newCommands, long time)
 {
-    if(newCommands.empty()) {
-        std::unique_lock<std::mutex> lck(m_queueMutex);
-        m_isStopped = true;
-        m_condition.notify_all();
+    if(newCommands.empty()) {        
+        m_isStopped.store(true, std::memory_order_relaxed);
+        m_fileCondition.notify_all();
+        m_stdoutCondition.notify_all();
         return;
     }
 
-    std::lock_guard<std::mutex> guard(m_queueMutex);
     std::string output = prepareData(newCommands);
     size_t size = newCommands.size();
 
@@ -179,10 +173,17 @@ void Registrator::update(const std::vector<std::string> &newCommands, long time)
                                                                return size;
                                                           };
 
-    m_stdOutQueue.push(std::make_pair(output, size));
-    m_fileLogQueue.push(logTask);
+    {
+        std::lock(m_fileMutex, m_stdoutMutex);
+        std::lock_guard<std::mutex> lck1(m_fileMutex, std::adopt_lock);
+        std::lock_guard<std::mutex> lck2(m_stdoutMutex, std::adopt_lock);
 
-    m_condition.notify_all();
+        m_stdOutQueue.push(std::make_pair(output, size));
+        m_fileLogQueue.push(logTask);
+    }
+
+    m_fileCondition.notify_all();
+    m_stdoutCondition.notify_all();
 }
 
 Observer::~Observer()

@@ -22,7 +22,7 @@ class Registrator: public Observer {
 public:
     Registrator();
     ~Registrator();
-    void update(const std::vector<std::string>& newCommands, long time);
+    void update(const std::vector<std::string>& newCommands, long time) override;
 
 private:
     void workerThread();
@@ -34,14 +34,17 @@ private:
 
 private:
 
-    bool                                            m_isStopped;
+    std::atomic_bool                                m_isStopped;
     std::queue<TTaskCallback>                       m_fileLogQueue;
     std::queue<std::pair<std::string, size_t>>      m_stdOutQueue;
 
     std::vector<std::thread>                        m_workers;
     std::thread                                     m_stdOutWorker;
-    std::mutex                                      m_queueMutex;
-    std::condition_variable                         m_condition;
+    std::mutex                                      m_fileMutex;
+    std::mutex                                      m_stdoutMutex;
+    std::condition_variable                         m_fileCondition;
+    std::condition_variable                         m_stdoutCondition;
 
     std::vector<int>                                m_loadBuffer;
+    std::size_t                                     m_logCounter;
 };

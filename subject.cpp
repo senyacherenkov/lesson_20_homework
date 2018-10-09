@@ -39,9 +39,8 @@ void Reader::readCommands()
     bool dynamicMode = false;
     int openBracketNumber = 0;
     int closeBracketNumber = 0;
-    bool stopped = false;
 
-    while (!stopped) {
+    while (true) {
         std::string temp;
         std::getline(std::cin, temp);
 
@@ -88,10 +87,9 @@ void Reader::readCommands()
             break;
         }
         else
-        {
-            stopped = true;
+        {            
             notifyObservers();
-
+            break;
         }
     }
     std::this_thread::sleep_for(std::chrono::seconds(1));
