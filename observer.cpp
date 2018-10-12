@@ -3,18 +3,9 @@
 #include <algorithm>
 #include "observer.h"
 
-namespace  {
-    struct unique {
-      int m_current = 0;
-      int operator()() {return ++m_current;}
-    } UniqueNumber;
-}
-
 Registrator::Registrator():
     m_isStopped(false)
 {
-    std::generate(m_loadBuffer.begin(), m_loadBuffer.end(), UniqueNumber);
-
     for(size_t i = 0; i < 2; i++)
         m_workers.emplace_back(
                     [this]
@@ -83,12 +74,12 @@ std::string Registrator::prepareData(const std::vector<std::string>& newCommands
 
     std::string output;
 
-    output.append("bulk: ");
+    output = "bulk: ";
 
     for(auto it = newCommands.begin(); it < newCommands.end(); it++) {
-        output.append(*it);
+        output += (*it);
         if(it != std::next(newCommands.begin(), static_cast<long>(newCommands.size() - 1)))
-            output.append(", ");
+            output += ", ";
     }
     return output;
 }
@@ -139,10 +130,10 @@ void Registrator::writeFileLog(std::string data, long time)
 {
     m_logCounter++;
     std::string nameOfFile("bulk");
-    nameOfFile.append(std::to_string(time));
-    nameOfFile.append("_");
-    nameOfFile.append(std::to_string(m_logCounter));
-    nameOfFile.append(".log");
+    nameOfFile += std::to_string(time);
+    nameOfFile += "_";
+    nameOfFile += std::to_string(m_logCounter);
+    nameOfFile += ".log";
 
     std::ofstream bulkLog;
     bulkLog.open(nameOfFile.c_str());

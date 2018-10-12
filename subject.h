@@ -26,20 +26,22 @@ protected:
 
 class Reader: public Subject {
 public:
+    Reader() = default;
     Reader(std::size_t N):
         m_N(N)
     {}
 
     ~Reader() = default;
 
-    void readCommands();
+    void readCommands(std::string testInput = std::string(""));
+    void setCommandNumber(size_t N) { m_N = N; }
 
 private:
     virtual void notifyObservers();
     void printSummary();
 
 private:
-    std::size_t m_N;
+    std::size_t                 m_N = 0;
     std::vector<std::string>    m_commands;
     long                        m_timeOfFirstCommand = 0;
     int                         m_nStrings = 0;

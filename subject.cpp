@@ -34,15 +34,21 @@ void Subject::removeObserver(std::shared_ptr<Observer> observer)
         m_observers.erase(it);
 }
 
-void Reader::readCommands()
+void Reader::readCommands(std::string testInput)
 {
     bool dynamicMode = false;
     int openBracketNumber = 0;
     int closeBracketNumber = 0;
+    std::string temp;
 
+
+#ifdef TEST_MODE
+    if(!testInput.empty) {
+        temp = testInput;
+#else
     while (true) {
-        std::string temp;
         std::getline(std::cin, temp);
+#endif
 
         if(!temp.empty())
         {
