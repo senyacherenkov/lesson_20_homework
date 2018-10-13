@@ -5,6 +5,7 @@
 #include <list>
 #include <chrono>
 #include "observer.h"
+#include "utility.h"
 
 using seconds_t = std::chrono::seconds;
 
@@ -24,6 +25,7 @@ protected:
 };
 
 
+
 class Reader: public Subject {
 public:
     Reader() = default;
@@ -33,7 +35,7 @@ public:
 
     ~Reader() = default;
 
-    void readCommands(std::string testInput = std::string(""));
+    ThreadData readCommands(std::string testInput = std::string(""));
     void setCommandNumber(size_t N) { m_N = N; }
 
 private:
@@ -44,7 +46,7 @@ private:
     std::size_t                 m_N = 0;
     std::vector<std::string>    m_commands;
     long                        m_timeOfFirstCommand = 0;
-    int                         m_nStrings = 0;
-    int                         m_nBlocks = 0;
-    int                         m_nCommands = 0;
+    ThreadData                  m_threadData;
 };
+
+std::ostream& operator << (std::ostream& out, ThreadData const& data);

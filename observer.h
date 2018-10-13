@@ -10,6 +10,7 @@
 #include <functional>
 #include <memory>
 #include <tuple>
+#include "utility.h"
 
 class Observer {
 public:
@@ -21,16 +22,18 @@ class Registrator: public Observer {
     using TTaskCallback = std::function<size_t()>;
 public:
     Registrator();
-    ~Registrator();
+    ~Registrator() override;
     void update(const std::vector<std::string>& newCommands, long time) override;
 
+    std::vector<ThreadData>& getThreadData() { return m_threadDataBuff; }
+    std::vector<std::string>& getFileNames() { return m_fileNames; }
 private:
     void workerThread();
 
     std::string prepareData(const std::vector<std::string>& newCommands) const;
     void writeStdOuput();
     void writeFileLog(std::string data, long time);
-    void printSummary(int nblocks, int ncommand);
+    void printSummary(ThreadData& data);
 
 private:
 
@@ -45,6 +48,8 @@ private:
     std::condition_variable                         m_fileCondition;
     std::condition_variable                         m_stdoutCondition;
 
-    std::vector<int>                                m_loadBuffer;
     std::size_t                                     m_logCounter;
+    std::vector<ThreadData>                         m_threadDataBuff;
+    std::vector<std::string>                        m_fileNames;
 };
+

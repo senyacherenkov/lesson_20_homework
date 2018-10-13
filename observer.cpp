@@ -6,12 +6,13 @@
 Registrator::Registrator():
     m_isStopped(false)
 {
+    m_threadDataBuff.resize(3);
+
     for(size_t i = 0; i < 2; i++)
         m_workers.emplace_back(
-                    [this]
+                    [this, i]
                         {
-                            thread_local int blocksNumber = 0;
-                            thread_local int commandsNumber = 0;
+                            thread_local ThreadData threadData;
 
                             while (!m_isStopped.load(std::memory_order_relaxed)) {
 
@@ -23,16 +24,15 @@ Registrator::Registrator():
                                 if (m_isStopped.load(std::memory_order_relaxed))
                                     break;
 
-                                std::random_shuffle(m_loadBuffer.begin(), m_loadBuffer.end());
                                 auto task = m_fileLogQueue.front();
                                 m_fileLogQueue.pop();
 
                                 lck.unlock();
 
-                                blocksNumber++;
+                                threadData.m_nBlocks++;
 
                                 size_t nCommands = task();
-                                commandsNumber += nCommands;
+                                threadData.m_nCommands += nCommands;
                             }
 
                             while(!m_fileLogQueue.empty()) {
@@ -42,12 +42,12 @@ Registrator::Registrator():
 
                                 lck.unlock();
 
-                                blocksNumber++;
+                                threadData.m_nBlocks++;
                                 size_t nCommands = task();
-                                commandsNumber += nCommands;
+                                threadData.m_nCommands += nCommands;
                             }
-
-                            printSummary(blocksNumber, commandsNumber);
+                            m_threadDataBuff[i] = threadData;
+                            printSummary(threadData);
                         });
 
     m_stdOutWorker = std::thread(&Registrator::writeStdOuput, this);
@@ -86,8 +86,7 @@ std::string Registrator::prepareData(const std::vector<std::string>& newCommands
 
 void Registrator::writeStdOuput()
 {
-    thread_local int blocksNumber = 0;
-    thread_local int commandsNumber = 0;
+    thread_local ThreadData threadData;
 
     while (!m_isStopped.load(std::memory_order_relaxed)) {
 
@@ -99,7 +98,6 @@ void Registrator::writeStdOuput()
         if (m_isStopped.load(std::memory_order_relaxed))
             break;
 
-        std::random_shuffle(m_loadBuffer.begin(), m_loadBuffer.end());
         auto pair = m_stdOutQueue.front();
         m_stdOutQueue.pop();
 
@@ -107,8 +105,8 @@ void Registrator::writeStdOuput()
 
         std::cout << pair.first << std::endl;        
 
-        blocksNumber++;
-        commandsNumber += pair.second;
+        threadData.m_nBlocks++;
+        threadData.m_nCommands += pair.second;
     }
 
     while(!m_stdOutQueue.empty()) {
@@ -119,11 +117,12 @@ void Registrator::writeStdOuput()
 
         std::cout << pair.first << std::endl;        
 
-        blocksNumber++;
-        commandsNumber += pair.second;
+        threadData.m_nBlocks++;
+        threadData.m_nCommands += pair.second;
     }
 
-    printSummary(blocksNumber, commandsNumber);
+    m_threadDataBuff[2] = threadData;
+    printSummary(threadData);
 }
 
 void Registrator::writeFileLog(std::string data, long time)
@@ -135,16 +134,18 @@ void Registrator::writeFileLog(std::string data, long time)
     nameOfFile += std::to_string(m_logCounter);
     nameOfFile += ".log";
 
+    m_fileNames.push_back(nameOfFile);
+
     std::ofstream bulkLog;
     bulkLog.open(nameOfFile.c_str());
     bulkLog << data;
     bulkLog.close();
 }
 
-void Registrator::printSummary(int nblocks, int ncommand)
+void Registrator::printSummary(ThreadData &data)
 {    
     std::cout << "thread - " << std::this_thread::get_id()
-              << " " << nblocks << " blocks, " << ncommand << " commands" << std::endl;
+              << " " << data << std::endl;
 }
 
 void Registrator::update(const std::vector<std::string> &newCommands, long time)

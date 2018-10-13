@@ -2,6 +2,7 @@
 #include "observer.h"
 #include "subject.h"
 
+#undef TEST_MODE
 
 int main(int argc, char *argv[])
 {

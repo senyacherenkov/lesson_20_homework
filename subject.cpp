@@ -1,5 +1,7 @@
 #include <algorithm>
+#include <sstream>
 #include "subject.h"
+#include "utility.h"
 
 namespace  {
     decltype(seconds_t().count()) get_seconds_since_epoch()
@@ -34,7 +36,7 @@ void Subject::removeObserver(std::shared_ptr<Observer> observer)
         m_observers.erase(it);
 }
 
-void Reader::readCommands(std::string testInput)
+ThreadData Reader::readCommands(std::string testInput)
 {
     bool dynamicMode = false;
     int openBracketNumber = 0;
@@ -43,7 +45,7 @@ void Reader::readCommands(std::string testInput)
 
 
 #ifdef TEST_MODE
-    if(!testInput.empty) {
+    if(!testInput.empty()) {
         temp = testInput;
 #else
     while (true) {
@@ -52,15 +54,15 @@ void Reader::readCommands(std::string testInput)
 
         if(!temp.empty())
         {
-            m_nStrings++;
+            m_threadData.m_nStrings++;
             if(m_commands.empty())
                 m_timeOfFirstCommand = get_seconds_since_epoch();
 
             if(temp == "}") {
                 closeBracketNumber++;
                 if(dynamicMode && !m_commands.empty() && (closeBracketNumber == openBracketNumber)) {
-                    m_nBlocks++;
-                    m_nCommands += m_commands.size();
+                    m_threadData.m_nBlocks++;
+                    m_threadData.m_nCommands += m_commands.size();
                     notifyObservers();
                     m_commands.clear();
                     dynamicMode = false;
@@ -79,15 +81,15 @@ void Reader::readCommands(std::string testInput)
             m_commands.push_back(temp);
             if(!dynamicMode && m_commands.size() == m_N) {
                notifyObservers();
-               m_nBlocks++;
-               m_nCommands += m_commands.size();
+               m_threadData.m_nBlocks++;
+               m_threadData.m_nCommands += m_commands.size();
                m_commands.clear();
             }
         }
         else if(!m_commands.empty())
         {
-            m_nBlocks++;
-            m_nCommands += m_commands.size();
+            m_threadData.m_nBlocks++;
+            m_threadData.m_nCommands += m_commands.size();
             notifyObservers();
             m_commands.clear();
             break;
@@ -99,7 +101,8 @@ void Reader::readCommands(std::string testInput)
         }
     }
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    printSummary();
+    std::cout << "main " << m_threadData;
+    return m_threadData;
 }
 
 void Reader::notifyObservers()
@@ -108,7 +111,4 @@ void Reader::notifyObservers()
         observer->update(m_commands, m_timeOfFirstCommand);
 }
 
-void Reader::printSummary()
-{
-    std::cout << "main " << m_nStrings << " strings, " << m_nCommands << " commands, " << m_nBlocks << " blocks" << std::endl;
-}
+
