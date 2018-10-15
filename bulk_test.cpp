@@ -33,10 +33,9 @@ BOOST_AUTO_TEST_CASE(check_proper_sorting)
     constexpr int THREAD_FILELOG2_NUMBER   = 1;
     constexpr int THREAD_STDOUT_NUMBER     = 2;
 
-    constexpr int AMOUNT_OF_FILE           = 2;
+    constexpr int AMOUNT_OF_FILE           = 1;
 
     {
-#define TEST_MODE
         ThreadData threadResult;
         Reader readerOfCommands(NUMBER_BLOCKS);
 
@@ -67,8 +66,9 @@ BOOST_AUTO_TEST_CASE(check_proper_sorting)
         if (fileStream.is_open())
         {
             while (!fileStream.eof())
-                fileStream >> outputData;
+                std::getline(fileStream, outputData);
             BOOST_CHECK_MESSAGE(outputData == output, "wrong data in file " << filenames.front());
+            fileStream.close();
         }
         else
             BOOST_MESSAGE("CANNOT OPEN FILE");

@@ -47,6 +47,9 @@ private:
     std::vector<std::string>    m_commands;
     long                        m_timeOfFirstCommand = 0;
     ThreadData                  m_threadData;
+    bool                        m_dynamicMode = false;
+    int                         m_openBracketNumber = 0;
+    int                         m_closeBracketNumber = 0;
 };
 
 std::ostream& operator << (std::ostream& out, ThreadData const& data);

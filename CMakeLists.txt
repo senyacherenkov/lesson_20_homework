@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(bulk_parallel)
-#VERSION 0.0.$ENV{TRAVIS_BUILD_NUMBER})
+project(bulk_parallel VERSION 0.0.$ENV{TRAVIS_BUILD_NUMBER})
 
 find_package(Boost COMPONENTS unit_test_framework REQUIRED)
 
@@ -30,6 +29,9 @@ target_link_libraries(bulk_test
     ${Boost_LIBRARIES}
     Threads::Threads
 )
+
+target_compile_definitions(bulk_test PRIVATE TEST_MODE)
+
 install(TARGETS bulkmt RUNTIME DESTINATION bin)
 
 set(CPACK_GENERATOR DEB)

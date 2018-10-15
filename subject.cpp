@@ -38,17 +38,13 @@ void Subject::removeObserver(std::shared_ptr<Observer> observer)
 
 ThreadData Reader::readCommands(std::string testInput)
 {
-    bool dynamicMode = false;
-    int openBracketNumber = 0;
-    int closeBracketNumber = 0;
     std::string temp;
 
-
-#ifdef TEST_MODE
-    if(!testInput.empty()) {
+    while (true) {
+#ifdef TEST_MODE    
         temp = testInput;
 #else
-    while (true) {
+
         std::getline(std::cin, temp);
 #endif
 
@@ -59,32 +55,43 @@ ThreadData Reader::readCommands(std::string testInput)
                 m_timeOfFirstCommand = get_seconds_since_epoch();
 
             if(temp == "}") {
-                closeBracketNumber++;
-                if(dynamicMode && !m_commands.empty() && (closeBracketNumber == openBracketNumber)) {
+                m_closeBracketNumber++;
+                if(m_dynamicMode && !m_commands.empty() && (m_closeBracketNumber == m_openBracketNumber)) {
                     m_threadData.m_nBlocks++;
                     m_threadData.m_nCommands += m_commands.size();
                     notifyObservers();
                     m_commands.clear();
-                    dynamicMode = false;
+                    m_dynamicMode = false;
                 }
+#ifdef TEST_MODE
+                break;
+#else
                 continue;
+#endif
             }
             if(temp == "{") {
-                openBracketNumber++;
-                if(!dynamicMode) {
+                m_openBracketNumber++;
+                if(!m_dynamicMode) {
                     m_commands.clear();
-                    dynamicMode = true;
+                    m_dynamicMode = true;
                 }
+#ifdef TEST_MODE
+                break;
+#else
                 continue;
+#endif
             }
 
             m_commands.push_back(temp);
-            if(!dynamicMode && m_commands.size() == m_N) {
+            if(!m_dynamicMode && m_commands.size() == m_N) {
                notifyObservers();
                m_threadData.m_nBlocks++;
                m_threadData.m_nCommands += m_commands.size();
                m_commands.clear();
             }
+#ifdef TEST_MODE
+                break;
+#endif
         }
         else if(!m_commands.empty())
         {
@@ -100,9 +107,15 @@ ThreadData Reader::readCommands(std::string testInput)
             break;
         }
     }
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    std::cout << "main " << m_threadData;
-    return m_threadData;
+
+    if(temp.empty())
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::cout << "main " << m_threadData;
+        return m_threadData;
+    }
+    else
+        return ThreadData();
 }
 
 void Reader::notifyObservers()
